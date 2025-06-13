@@ -99,10 +99,18 @@ const deploy = ({
         maxBuffer: 104857600,
       });
     } else {
-      execSync(
-        `git push --no-verify ${force} heroku \`git subtree split --prefix=${appdir} ${branch}\`:refs/heads/main`,
-        { maxBuffer: 104857600 }
-      );
+      const tempBranch = `deploy-${Date.now()}`;
+      try {
+        // Create and switch to temporary branch with only the subdirectory
+        execSync(`git checkout -b ${tempBranch}`);
+        execSync(`git filter-branch --subdirectory-filter ${appdir} ${tempBranch}`);
+        execSync(`git push --no-verify heroku ${tempBranch}:refs/heads/main ${force}`, {
+          maxBuffer: 104857600,
+        });
+      } finally {
+        execSync(`git checkout ${branch}`);
+        execSync(`git branch -D ${tempBranch}`, { stdio: 'ignore' });
+      }
     }
   }
 };
