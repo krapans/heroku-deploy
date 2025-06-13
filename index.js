@@ -99,17 +99,37 @@ const deploy = ({
         maxBuffer: 104857600,
       });
     } else {
-      const tempBranch = `deploy-${Date.now()}`;
+      // execSync(
+      //   `git push --no-verify ${force} heroku \`git subtree split --prefix=${appdir} ${branch}\`:refs/heads/main`,
+      //   { maxBuffer: 104857600 }
+      // );
+      // Alternative approach for shallow repos - create temporary git repo
+      const tempDir = `heroku-deployment-${Date.now()}`
+      
       try {
-        // Create and switch to temporary branch with only the subdirectory
-        execSync(`git checkout -b ${tempBranch}`);
-        execSync(`git filter-branch --subdirectory-filter ${appdir} ${tempBranch}`);
-        execSync(`git push --no-verify heroku ${tempBranch}:refs/heads/main ${force}`, {
+        // Copy appdir contents to temp directory
+        execSync(`cp -r ${appdir}/. ${tempDir}/`);
+        
+        // Initialize new git repo in temp directory
+        execSync(`git init`, { cwd: tempDir });
+        execSync(`git config user.name "Heroku-Deploy"`, { cwd: tempDir });
+        execSync(`git config user.email "${heroku.email}"`, { cwd: tempDir });
+        
+        // Add heroku remote
+        execSync(`heroku git:remote --app ${app_name}`, { cwd: tempDir });
+        
+        // Add all files and commit
+        execSync(`git add -A`, { cwd: tempDir });
+        execSync(`git commit -m "Deploy from ${appdir}"`, { cwd: tempDir });
+        
+        // Push to heroku
+        execSync(`git push --no-verify ${force} heroku HEAD:refs/heads/main`, {
+          cwd: tempDir,
           maxBuffer: 104857600,
         });
       } finally {
-        execSync(`git checkout ${branch}`);
-        execSync(`git branch -D ${tempBranch}`, { stdio: 'ignore' });
+        // Clean up temp directory
+        execSync(`rm -rf ${tempDir}`);
       }
     }
   }
