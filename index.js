@@ -63,6 +63,42 @@ const createProcfile = ({ procfile, appdir }) => {
   }
 };
 
+const deployWithTempRepo = ({ app_name, sourcePath, commitMessage, force, heroku }) => {
+  const tempDir = `heroku-deployment-${Date.now()}`;
+  
+  try {
+    // Copy source to temp directory
+    if (sourcePath === ".") {
+      // Copy everything for whole repo, excluding the temp directory and .git
+      execSync(`rsync -av --exclude='${tempDir}' --exclude='.git' . ${tempDir}/`);
+    } else {
+      // Copy specific directory
+      execSync(`cp -r ${sourcePath}/. ${tempDir}/`);
+    }
+    
+    // Initialize new git repo in temp directory
+    execSync(`git init`, { cwd: tempDir });
+    execSync(`git config user.name "Heroku-Deploy"`, { cwd: tempDir });
+    execSync(`git config user.email "${heroku.email}"`, { cwd: tempDir });
+    
+    // Add heroku remote
+    execSync(`heroku git:remote --app ${app_name}`, { cwd: tempDir });
+    
+    // Add all files and commit
+    execSync(`git add -A`, { cwd: tempDir });
+    execSync(`git commit -m "${commitMessage}"`, { cwd: tempDir });
+    
+    // Push to heroku
+    execSync(`git push --no-verify ${force} heroku HEAD:refs/heads/main`, {
+      cwd: tempDir,
+      maxBuffer: 104857600,
+    });
+  } finally {
+    // Clean up temp directory
+    execSync(`rm -rf ${tempDir}`);
+  }
+};
+
 const deploy = ({
   dontuseforce,
   app_name,
@@ -95,14 +131,21 @@ const deploy = ({
     }
 
     if (appdir === "") {
-      execSync(`git push --no-verify heroku ${branch}:refs/heads/main ${force}`, {
-        maxBuffer: 104857600,
+      deployWithTempRepo({
+        app_name,
+        sourcePath: ".",
+        commitMessage: "Deploy whole repository",
+        force,
+        heroku
       });
     } else {
-      execSync(
-        `git push --no-verify ${force} heroku \`git subtree split --prefix=${appdir} ${branch}\`:refs/heads/main`,
-        { maxBuffer: 104857600 }
-      );
+      deployWithTempRepo({
+        app_name,
+        sourcePath: appdir,
+        commitMessage: `Deploy from ${appdir}`,
+        force,
+        heroku
+      });
     }
   }
 };
@@ -196,15 +239,15 @@ if (heroku.dockerBuildArgs) {
 
     // Check if using Docker
     if (!heroku.usedocker) {
-      // Check if Repo clone is shallow
-      const isShallow = execSync(
-        "git rev-parse --is-shallow-repository"
-      ).toString();
+      // // Check if Repo clone is shallow
+      // const isShallow = execSync(
+      //   "git rev-parse --is-shallow-repository"
+      // ).toString();
 
-      // If the Repo clone is shallow, make it unshallow
-      if (isShallow === "true\n") {
-        execSync("git fetch --prune --unshallow");
-      }
+      // // If the Repo clone is shallow, make it unshallow
+      // if (isShallow === "true\n") {
+      //   execSync("git fetch --prune --unshallow");
+      // }
     }
 
     execSync(createCatFile(heroku));
