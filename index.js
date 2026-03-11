@@ -77,16 +77,16 @@ const deployWithTempRepo = ({ app_name, sourcePath, commitMessage, force, heroku
     }
     
     // Initialize new git repo in temp directory
-    execSync(`git init`, { cwd: tempDir });
+    execSync(`git init -q`, { cwd: tempDir });
     execSync(`git config user.name "Heroku-Deploy"`, { cwd: tempDir });
     execSync(`git config user.email "${heroku.email}"`, { cwd: tempDir });
-    
+
     // Add heroku remote
     execSync(`heroku git:remote --app ${app_name}`, { cwd: tempDir });
-    
-    // Add all files and commit
+
+    // Add all files and commit — use quiet mode and large buffer to handle repos with many files
     execSync(`git add -A`, { cwd: tempDir });
-    execSync(`git commit -m "${commitMessage}"`, { cwd: tempDir });
+    execSync(`git commit -q -m "${commitMessage}"`, { cwd: tempDir, maxBuffer: 104857600 });
     
     // Push to heroku
     execSync(`git push --no-verify ${force} heroku HEAD:refs/heads/main`, {
