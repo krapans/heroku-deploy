@@ -70,7 +70,7 @@ const deployWithTempRepo = ({ app_name, sourcePath, commitMessage, force, heroku
     // Copy source to temp directory
     if (sourcePath === ".") {
       // Copy everything for whole repo, excluding the temp directory and .git
-      execSync(`rsync -av --exclude='${tempDir}' --exclude='.git' . ${tempDir}/`);
+      execSync(`rsync -a --exclude='${tempDir}' --exclude='.git' . ${tempDir}/`);
     } else {
       // Copy specific directory
       execSync(`cp -r ${sourcePath}/. ${tempDir}/`);
